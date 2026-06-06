@@ -58,6 +58,7 @@ export const BookGetButton = ({
   const isCompleted = buttonState?.state === 'complete';
   const hasError = buttonState?.state === 'error';
   const isBlocked = buttonState?.state === 'blocked';
+  const isInLibrary = Boolean(book.kavita_available);
   const isInProgress =
     buttonState && ['queued', 'resolving', 'locating', 'downloading'].includes(buttonState.state);
   const showCircularProgress =
@@ -65,10 +66,15 @@ export const BookGetButton = ({
   const showSpinner = (isInProgress && !showCircularProgress) || isLoading;
 
   // Disable button while loading metadata
-  const isDisabled = isLoading || isBlocked;
+  const isDisabled = isLoading || isBlocked || isInLibrary;
 
   // Determine button styling based on state
   const getButtonClasses = () => {
+    if (isInLibrary) {
+      return isIconVariant
+        ? 'text-sky-600 dark:text-sky-400 cursor-not-allowed'
+        : 'bg-sky-600 opacity-90 cursor-not-allowed';
+    }
     if (isCompleted) {
       return isIconVariant ? 'bg-green-600 text-white' : 'bg-green-600 hover:bg-green-700';
     }
@@ -101,6 +107,7 @@ export const BookGetButton = ({
 
   // Determine display text
   const getDisplayText = () => {
+    if (isInLibrary) return 'In Library';
     if (isBlocked) return buttonState?.text || 'Unavailable';
     if (isCompleted) return 'Downloaded';
     if (hasError) return 'Failed';
@@ -115,6 +122,18 @@ export const BookGetButton = ({
 
   // Render appropriate icon based on state
   const renderIcon = () => {
+    if (isInLibrary) {
+      return (
+        <svg className={iconSize} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25"
+          />
+        </svg>
+      );
+    }
+
     if (isCompleted) {
       return (
         <svg className={iconSize} fill="none" stroke="currentColor" viewBox="0 0 24 24">

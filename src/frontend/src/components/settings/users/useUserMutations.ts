@@ -49,6 +49,7 @@ const authSourceLabel: Record<AdminUser['auth_source'], string> = {
   oidc: 'OIDC',
   proxy: 'Proxy',
   cwa: 'CWA',
+  kavita: 'Kavita',
 };
 
 export const useUserMutations = ({

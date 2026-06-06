@@ -10,6 +10,9 @@ interface LoginPageProps {
   oidcButtonLabel?: string | null;
   hideLocalAuth?: boolean;
   oidcAutoRedirect?: boolean;
+  kavitaLoginEnabled?: boolean;
+  kavitaDefaultSource?: string;
+  kavitaButtonLabel?: string | null;
 }
 
 export const LoginPage = ({
@@ -20,6 +23,9 @@ export const LoginPage = ({
   oidcButtonLabel,
   hideLocalAuth,
   oidcAutoRedirect,
+  kavitaLoginEnabled,
+  kavitaDefaultSource,
+  kavitaButtonLabel,
 }: LoginPageProps) => {
   const logoUrl = withBasePath('/logo.png');
 
@@ -48,6 +54,9 @@ export const LoginPage = ({
             oidcButtonLabel={oidcButtonLabel}
             hideLocalAuth={hideLocalAuth}
             oidcAutoRedirect={oidcAutoRedirect}
+            kavitaLoginEnabled={kavitaLoginEnabled}
+            kavitaDefaultSource={kavitaDefaultSource}
+            kavitaButtonLabel={kavitaButtonLabel}
           />
         </div>
       </div>

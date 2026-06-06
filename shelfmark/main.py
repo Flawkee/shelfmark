@@ -49,7 +49,12 @@ from shelfmark.core.auth_modes import (
 from shelfmark.core.config import config as app_config
 from shelfmark.core.cwa_user_sync import upsert_cwa_user
 from shelfmark.core.download_history_service import DownloadHistoryService
+from shelfmark.core.kavita_inventory_service import (
+    get_inventory_service,
+    init_inventory_service,
+)
 from shelfmark.core.external_user_linking import upsert_external_user
+from shelfmark.integrations.kavita.client import KavitaError, kavita_login_user
 from shelfmark.core.logger import setup_logger
 from shelfmark.core.models import TERMINAL_QUEUE_STATUSES, QueueStatus, SearchFilters
 from shelfmark.core.notifications import (
@@ -179,6 +184,7 @@ try:
     user_db.initialize()
     download_history_service = DownloadHistoryService(_user_db_path)
     activity_view_state_service = ActivityViewStateService(_user_db_path)
+    init_inventory_service(_user_db_path)
     import_module("shelfmark.config.users_settings")
     from shelfmark.core.admin_routes import register_admin_routes
     from shelfmark.core.oidc_routes import register_oidc_routes
@@ -199,6 +205,13 @@ except (sqlite3.OperationalError, OSError) as e:
 
 # Start download coordinator
 backend.start()
+
+try:
+    from shelfmark.integrations.kavita.scheduler import start_scheduler as _start_kavita_scheduler
+
+    _start_kavita_scheduler()
+except Exception as _kavita_sched_exc:  # noqa: BLE001 - scheduler must never block startup
+    logger.warning("Failed to start Kavita scheduler: %s", _kavita_sched_exc)
 
 # Rate limiting for login attempts
 # Map usernames to their failed-attempt counters and lockout timestamps.
@@ -1377,6 +1390,14 @@ def _record_download_queued(task_id: str, task: Any) -> None:
 def _record_download_terminal_snapshot(task_id: str, status: QueueStatus, task: Any) -> None:
     _notify_admin_for_terminal_download_status(task_id=task_id, status=status, task=task)
 
+    if status == QueueStatus.COMPLETE:
+        try:
+            from shelfmark.integrations.kavita.scheduler import request_sync_after_download
+
+            request_sync_after_download()
+        except Exception as exc:  # noqa: BLE001 - never break the download pipeline
+            logger.debug("Could not schedule post-download Kavita sync: %s", exc)
+
     final_status = _queue_status_to_final_activity_status(status)
     if final_status is None:
         return
@@ -2198,6 +2219,69 @@ def api_login() -> Response | tuple[Response, int]:
                 logger.error_trace(f"CWA database error during login: {e}")
                 return jsonify({"error": "Authentication system error"}), 500
 
+        if auth_mode == "kavita":
+            source = str(data.get("source") or "").strip().lower()
+            if source not in ("local", "kavita"):
+                source = str(app_config.get("KAVITA_DEFAULT_SOURCE", "kavita")).strip().lower()
+
+            if source == "local":
+                if user_db is None:
+                    return jsonify({"error": "Authentication service unavailable"}), 503
+                db_user = user_db.get_user(username=username)
+                if not db_user or not db_user.get("password_hash") or not check_password_hash(
+                    db_user["password_hash"], password
+                ):
+                    return _failed_login_response(username, ip_address)
+                is_admin = db_user["role"] == "admin"
+                session["user_id"] = username
+                session["db_user_id"] = db_user["id"]
+                session["is_admin"] = is_admin
+                session.permanent = remember_me
+                clear_failed_logins(username)
+                logger.info(
+                    "Login successful for user '%s' from IP %s (kavita mode, local source, is_admin=%s)",
+                    username,
+                    ip_address,
+                    is_admin,
+                )
+                return jsonify({"success": True})
+
+            if user_db is None:
+                return jsonify({"error": "Authentication service unavailable"}), 503
+            try:
+                kavita_user = kavita_login_user(
+                    str(app_config.get("KAVITA_URL", "")),
+                    username,
+                    password,
+                )
+            except KavitaError as exc:
+                logger.warning("Kavita login failed for '%s' from IP %s: %s", username, ip_address, exc)
+                return _failed_login_response(username, ip_address)
+
+            db_user, _ = upsert_external_user(
+                user_db,
+                auth_source="kavita",
+                username=kavita_user["username"] or username,
+                role="user",
+                email=kavita_user.get("email"),
+                collision_strategy="suffix",
+                sync_role=False,
+                context="kavita_login",
+            )
+            session["user_id"] = db_user["username"]
+            session["db_user_id"] = db_user["id"]
+            session["is_admin"] = db_user["role"] == "admin"
+            session.permanent = remember_me
+            clear_failed_logins(username)
+            logger.info(
+                "Login successful for user '%s' from IP %s (kavita auth, is_admin=%s, remember_me=%s)",
+                username,
+                ip_address,
+                session["is_admin"],
+                remember_me,
+            )
+            return jsonify({"success": True})
+
         # Should not reach here, but handle gracefully
         return jsonify({"error": "Unknown authentication mode"}), 500
 
@@ -2289,6 +2373,15 @@ def api_auth_check() -> Response | tuple[Response, int]:
 
         if auth_mode in ("builtin", "oidc") and DISABLE_LOCAL_AUTH:
             response_data["hide_local_auth"] = True
+
+        if auth_mode == "kavita":
+            response_data["kavita_login_enabled"] = True
+            response_data["kavita_default_source"] = str(
+                app_config.get("KAVITA_DEFAULT_SOURCE", "kavita")
+            )
+            kavita_label = app_config.get("KAVITA_LOGIN_BUTTON_LABEL", "")
+            if kavita_label:
+                response_data["kavita_button_label"] = kavita_label
 
         # Add custom OIDC button label and SSO enforcement flags if configured
         if auth_mode == "oidc":
@@ -2454,6 +2547,45 @@ def api_metadata_config() -> Response | tuple[Response, int]:
         return jsonify({"error": str(e)}), 500
 
 
+def _annotate_kavita_availability(books_data: list[dict[str, Any]]) -> None:
+    """Flag search results already present in Kavita (book- and series-level).
+
+    Best-effort: a missing/unsynced inventory or any DB error leaves the
+    default ``kavita_available=False`` / ``kavita_series_owned=None`` untouched.
+    """
+    inventory = get_inventory_service()
+    if inventory is None or not books_data:
+        return
+    try:
+        if inventory.count() == 0:
+            return
+    except Exception:  # noqa: BLE001 - availability must never break search
+        return
+
+    series_cache: dict[str, int] = {}
+    for book in books_data:
+        try:
+            authors = book.get("authors") or []
+            author = authors[0] if authors else book.get("search_author")
+            book["kavita_available"] = inventory.lookup_book(
+                isbn_13=book.get("isbn_13"),
+                isbn_10=book.get("isbn_10"),
+                title=book.get("search_title") or book.get("title"),
+                author=author,
+                series_name=book.get("series_name"),
+                series_index=book.get("series_position"),
+                raw_title=book.get("title"),
+            )
+            series_name = book.get("series_name")
+            if series_name:
+                if series_name not in series_cache:
+                    series_cache[series_name] = inventory.series_coverage(series_name)
+                owned = series_cache[series_name]
+                book["kavita_series_owned"] = owned or None
+        except Exception:  # noqa: BLE001 - skip annotation for this book on error
+            continue
+
+
 @app.route("/api/metadata/search", methods=["GET"])
 @login_required
 def api_metadata_search() -> Response | tuple[Response, int]:
@@ -2580,6 +2712,8 @@ def api_metadata_search() -> Response | tuple[Response, int]:
             if book_dict.get("cover_url"):
                 cache_id = f"{book_dict['provider']}_{book_dict['provider_id']}"
                 book_dict["cover_url"] = transform_cover_url(book_dict["cover_url"], cache_id)
+
+        _annotate_kavita_availability(books_data)
 
         response_data = {
             "books": books_data,
@@ -3106,6 +3240,7 @@ def api_settings_get_all() -> Response | tuple[Response, int]:
         # This triggers the @register_settings decorators
         import_module("shelfmark.config.settings")
         import_module("shelfmark.config.users_settings")
+        import_module("shelfmark.config.kavita_settings")
         from shelfmark.core.settings_registry import serialize_all_settings
 
         data = serialize_all_settings(include_values=True)
@@ -3134,6 +3269,7 @@ def api_settings_get_tab(tab_name: str) -> Response | tuple[Response, int]:
         # Ensure settings are registered
         import_module("shelfmark.config.settings")
         import_module("shelfmark.config.users_settings")
+        import_module("shelfmark.config.kavita_settings")
         from shelfmark.core.settings_registry import (
             get_settings_tab,
             serialize_tab,
@@ -3171,6 +3307,7 @@ def api_settings_update_tab(tab_name: str) -> Response | tuple[Response, int]:
         # Ensure settings are registered
         import_module("shelfmark.config.settings")
         import_module("shelfmark.config.users_settings")
+        import_module("shelfmark.config.kavita_settings")
         from shelfmark.core.settings_registry import (
             get_settings_tab,
             update_settings,
@@ -3221,6 +3358,7 @@ def api_settings_execute_action(tab_name: str, action_key: str) -> Response | tu
         # Ensure settings are registered
         import_module("shelfmark.config.settings")
         import_module("shelfmark.config.users_settings")
+        import_module("shelfmark.config.kavita_settings")
         from shelfmark.core.settings_registry import execute_action
 
         # Get current form values if provided (for testing with unsaved values)

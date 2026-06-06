@@ -35,6 +35,8 @@ export interface MetadataBookData {
   search_title?: string;
   search_author?: string;
   titles_by_language?: Record<string, string>;
+  kavita_available?: boolean;
+  kavita_series_owned?: number;
 }
 
 export interface SourceRecordData {
@@ -101,6 +103,8 @@ export function transformMetadataToBook(data: MetadataBookData): Book {
     search_author: data.search_author,
     authors: data.authors,
     titles_by_language: data.titles_by_language,
+    kavita_available: data.kavita_available,
+    kavita_series_owned: data.kavita_series_owned,
     info: {
       ...(data.isbn_13 && { ISBN: data.isbn_13 }),
       ...(data.isbn_10 && !data.isbn_13 && { ISBN: data.isbn_10 }),

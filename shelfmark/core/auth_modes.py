@@ -14,11 +14,13 @@ AUTH_SOURCE_BUILTIN = "builtin"
 AUTH_SOURCE_OIDC = "oidc"
 AUTH_SOURCE_PROXY = "proxy"
 AUTH_SOURCE_CWA = "cwa"
+AUTH_SOURCE_KAVITA = "kavita"
 AUTH_SOURCES = (
     AUTH_SOURCE_BUILTIN,
     AUTH_SOURCE_OIDC,
     AUTH_SOURCE_PROXY,
     AUTH_SOURCE_CWA,
+    AUTH_SOURCE_KAVITA,
 )
 AUTH_SOURCE_SET = frozenset(AUTH_SOURCES)
 _ALWAYS_ADMIN_SETTINGS_TABS = frozenset({"security", "users"})
@@ -83,6 +85,13 @@ def determine_auth_mode(
     if auth_mode == AUTH_SOURCE_BUILTIN and local_admin_available:
         return AUTH_SOURCE_BUILTIN
 
+    if (
+        auth_mode == AUTH_SOURCE_KAVITA
+        and local_admin_available
+        and security_config.get("KAVITA_URL")
+    ):
+        return AUTH_SOURCE_KAVITA
+
     if auth_mode == AUTH_SOURCE_PROXY and security_config.get("PROXY_AUTH_USER_HEADER"):
         return AUTH_SOURCE_PROXY
 
@@ -112,6 +121,7 @@ def load_active_auth_mode(
             "PROXY_AUTH_USER_HEADER": app_config.get("PROXY_AUTH_USER_HEADER", ""),
             "OIDC_DISCOVERY_URL": app_config.get("OIDC_DISCOVERY_URL", ""),
             "OIDC_CLIENT_ID": app_config.get("OIDC_CLIENT_ID", ""),
+            "KAVITA_URL": app_config.get("KAVITA_URL", ""),
         }
         return determine_auth_mode(
             security_config,
@@ -127,7 +137,7 @@ def is_user_active_for_auth_mode(user: Mapping[str, Any], auth_mode: str) -> boo
     """Return whether a user can authenticate under the current auth mode."""
     source = normalize_auth_source(user.get("auth_source"), user.get("oidc_subject"))
     if source == AUTH_SOURCE_BUILTIN:
-        return auth_mode in (AUTH_SOURCE_BUILTIN, AUTH_SOURCE_OIDC)
+        return auth_mode in (AUTH_SOURCE_BUILTIN, AUTH_SOURCE_OIDC, AUTH_SOURCE_KAVITA)
     return source == auth_mode
 
 

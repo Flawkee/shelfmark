@@ -5,7 +5,7 @@ import type { Book, ButtonStateInfo } from '../../types';
 import { bookSupportsTargets } from '../../utils/bookTargetLoader';
 import { BookActionButton } from '../BookActionButton';
 import { BookTargetDropdown } from '../BookTargetDropdown';
-import { DisplayFieldBadges } from '../shared';
+import { DisplayFieldBadges, KavitaBadge } from '../shared';
 
 const SkeletonLoader = () => (
   <div className="h-full w-full animate-pulse bg-linear-to-r from-gray-300 via-gray-200 to-gray-300 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700" />
@@ -97,6 +97,9 @@ export const CardView = ({
               #{book.series_position}
             </div>
           )}
+          <div className="absolute top-2 right-2 z-10">
+            <KavitaBadge book={book} variant="overlay" />
+          </div>
           {book.preview && !imageError ? (
             <>
               {!imageLoaded && (

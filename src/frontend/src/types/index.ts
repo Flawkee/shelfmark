@@ -56,6 +56,8 @@ export interface Book {
   titles_by_language?: Record<string, string>;
   username?: string;
   retry_available?: boolean;
+  kavita_available?: boolean;
+  kavita_series_owned?: number;
 }
 
 // Status response types
@@ -327,6 +329,7 @@ export interface LoginCredentials {
   username: string;
   password: string;
   remember_me: boolean;
+  source?: string;
 }
 
 export interface AuthResponse {
@@ -342,6 +345,9 @@ export interface AuthResponse {
   oidc_button_label?: string;
   hide_local_auth?: boolean;
   oidc_auto_redirect?: boolean;
+  kavita_login_enabled?: boolean;
+  kavita_default_source?: string;
+  kavita_button_label?: string;
 }
 
 export interface ActingAsUserSelection {

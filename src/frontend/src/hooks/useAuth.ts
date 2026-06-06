@@ -23,6 +23,9 @@ interface UseAuthReturn {
   oidcButtonLabel: string | null;
   hideLocalAuth: boolean;
   oidcAutoRedirect: boolean;
+  kavitaLoginEnabled: boolean;
+  kavitaDefaultSource: string;
+  kavitaButtonLabel: string | null;
   loginError: string | null;
   isLoggingIn: boolean;
   setIsAuthenticated: (value: boolean) => void;
@@ -48,6 +51,9 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
   const [oidcButtonLabel, setOidcButtonLabel] = useState<string | null>(null);
   const [hideLocalAuth, setHideLocalAuth] = useState(false);
   const [oidcAutoRedirect, setOidcAutoRedirect] = useState(false);
+  const [kavitaLoginEnabled, setKavitaLoginEnabled] = useState(false);
+  const [kavitaDefaultSource, setKavitaDefaultSource] = useState('kavita');
+  const [kavitaButtonLabel, setKavitaButtonLabel] = useState<string | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
@@ -61,6 +67,9 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
     setOidcButtonLabel(response.oidc_button_label || null);
     setHideLocalAuth(response.hide_local_auth || false);
     setOidcAutoRedirect(response.oidc_auto_redirect || false);
+    setKavitaLoginEnabled(response.kavita_login_enabled || false);
+    setKavitaDefaultSource(response.kavita_default_source || 'kavita');
+    setKavitaButtonLabel(response.kavita_button_label || null);
   }, []);
 
   const refreshSocketSession = useCallback(() => {
@@ -192,6 +201,9 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
     oidcButtonLabel,
     hideLocalAuth,
     oidcAutoRedirect,
+    kavitaLoginEnabled,
+    kavitaDefaultSource,
+    kavitaButtonLabel,
     loginError,
     isLoggingIn,
     setIsAuthenticated,

@@ -2,8 +2,22 @@
 
 <img src="src/frontend/public/logo.png" alt="Shelfmark" width="200">
 
+> [!IMPORTANT]
+> **This is a fork** of [Shelfmark](https://github.com/calibrain/shelfmark) that adds deep [Kavita](https://github.com/Kareadita/Kavita) integration — single sign-on, library availability awareness, and library-aware notifications. See [Kavita Integration](#-kavita-integration) below.
+
 > [!NOTE]
-> This project is in a stable state as of May 2026 but is not under active maintenance. 
+> The upstream project is in a stable state as of May 2026 but is not under active maintenance.
+
+## 📖 Kavita Integration
+
+This fork connects Shelfmark to your [Kavita](https://github.com/Kareadita/Kavita) server so you stop requesting books you already own.
+
+- **Kavita SSO** — Sign in with your Kavita account. A login-page source selector (Local / Kavita, admin-set default) lets local and Kavita users coexist; Kavita logins auto-provision a linked Shelfmark user. Admins keep full control over each user's role.
+- **Already-in-Library awareness** — A scheduled sync scans your Kavita libraries and flags matching search results. Owned titles show an **In Library** button (instead of *Get*) so they can't be re-requested, and a **Library X/N** chip shows how much of a series you already have. Matches books **and** manga — including multi-volume series and titles with subtitles.
+- **"Available in Library" notifications** — Get notified (any Apprise destination) when a **new** title is added to your Kavita library. Fires only on genuinely new items, never on the initial baseline scan.
+- **Admin Kavita tab** — Connect with a URL + API key (with a connection test), pick which libraries to sync, set a cron schedule, and optionally re-sync right after a download completes.
+
+Configure it under **Settings → Kavita** (connection + sync) and **Settings → Security** (set auth method to *Kavita*).
 
 Shelfmark is a self-hosted web interface for searching and requesting books and audiobooks across multiple sources. Bring your own sources, metadata providers, and download clients to build a single hub for your digital library. Supports multiple users with a built-in request system, so you can share your instance with others and let them browse and request books on their own.
 
@@ -13,6 +27,7 @@ Works great alongside the following library tools, with support for automatic im
 - [Calibre-Web-Automated](https://github.com/crocodilestick/Calibre-Web-Automated)
 - [Grimmory](https://github.com/grimmory-tools/grimmory)
 - [Audiobookshelf](https://github.com/advplyr/audiobookshelf)
+- [Kavita](https://github.com/Kareadita/Kavita) — with SSO and library availability awareness ([details](#-kavita-integration))
 
 ## ✨ Features
 
@@ -21,7 +36,8 @@ Works great alongside the following library tools, with support for automatic im
 - **Audiobook Support** - Full audiobook search and download with dedicated processing
 - **Flexible Search** - Search metadata providers (Hardcover, Open Library, Google Books) for rich book and audiobook discovery, or query configured sources directly
 - **Multi-User & Requests** - Share your instance with others, let users browse and request books, and manage approvals with configurable notifications
-- **Authentication** - Built-in login, OIDC single sign-on, proxy auth, and Calibre-Web database support
+- **Authentication** - Built-in login, OIDC single sign-on, proxy auth, Calibre-Web database, and **Kavita SSO**
+- **Kavita Library Awareness** - Flags books & manga already in your [Kavita](https://github.com/Kareadita/Kavita) library so users don't re-request them, with notifications for new arrivals ([details](#-kavita-integration))
 - **Real-Time Progress** - Unified download queue with live status updates across all sources
 - **Network Flexibility** - Configurable proxy support, DNS settings, and optional Cloudflare handling for protected sources
 

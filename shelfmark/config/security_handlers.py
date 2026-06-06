@@ -20,6 +20,16 @@ _OIDC_REQUIRED_FIELDS = (
 )
 
 
+def _has_kavita_config() -> bool:
+    """Return True if KAVITA_URL and KAVITA_API_KEY are saved in the kavita config."""
+    from shelfmark.core.settings_registry import load_config_file
+
+    kavita_cfg = load_config_file("kavita")
+    url = str(kavita_cfg.get("KAVITA_URL") or "").strip()
+    api_key = str(kavita_cfg.get("KAVITA_API_KEY") or "").strip()
+    return bool(url and api_key)
+
+
 def _has_local_password_admin() -> bool:
     root = os.environ.get("CONFIG_DIR", "/config")
     user_db = UserDB(str(Path(root) / "users.db"))
@@ -77,6 +87,28 @@ def on_save_security(
 
     effective_values = _load_effective_security_values(normalized_values)
     auth_method = str(effective_values.get("AUTH_METHOD", "") or "").strip().lower()
+
+    if auth_method == "kavita":
+        if not _has_kavita_config():
+            return {
+                "error": True,
+                "message": (
+                    "Kavita is not configured. Go to the Kavita settings tab, "
+                    "enter your Kavita URL and API key, test the connection, and save before "
+                    "enabling Kavita as the authentication source."
+                ),
+                "values": normalized_values,
+            }
+        if not _has_local_password_admin():
+            return {
+                "error": True,
+                "message": (
+                    "A local admin account with a password is required before enabling Kavita login. "
+                    "Use the 'Go to Users' button above to create one. "
+                    "This ensures you can still sign in if Kavita is unavailable."
+                ),
+                "values": normalized_values,
+            }
 
     if auth_method == "oidc":
         if not DISABLE_LOCAL_AUTH and not _has_local_password_admin():

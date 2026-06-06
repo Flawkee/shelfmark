@@ -23,6 +23,7 @@ dependencies = [
     "transmission-rpc",
     "authlib>=1.7.2,<1.8",
     "apprise>=1.10.0",
+    "apscheduler>=3.10,<4",
 ]
 
 [project.optional-dependencies]

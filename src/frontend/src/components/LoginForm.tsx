@@ -16,6 +16,9 @@ interface LoginFormProps {
   oidcButtonLabel?: string | null;
   hideLocalAuth?: boolean;
   oidcAutoRedirect?: boolean;
+  kavitaLoginEnabled?: boolean;
+  kavitaDefaultSource?: string;
+  kavitaButtonLabel?: string | null;
 }
 
 const EyeIcon = () => (
@@ -224,8 +227,13 @@ export const LoginForm = ({
   oidcButtonLabel,
   hideLocalAuth = false,
   oidcAutoRedirect = false,
+  kavitaLoginEnabled = false,
+  kavitaDefaultSource = 'kavita',
+  kavitaButtonLabel,
 }: LoginFormProps) => {
   const isOidc = authMode === 'oidc';
+  const normalizedDefaultSource = kavitaDefaultSource === 'local' ? 'local' : 'kavita';
+  const [loginSource, setLoginSource] = useState<'local' | 'kavita'>(normalizedDefaultSource);
   const [showPasswordLogin, setShowPasswordLogin] = useState(false);
   const [lastAutoExpandPasswordLoginKey, setLastAutoExpandPasswordLoginKey] = useState('');
   const [searchParams] = useSearchParams();
@@ -262,9 +270,42 @@ export const LoginForm = ({
         username: usernameValue,
         password: passwordValue,
         remember_me: formData.has('remember_me'),
+        ...(kavitaLoginEnabled ? { source: loginSource } : {}),
       });
     }
   };
+
+  const sourceSelector = kavitaLoginEnabled ? (
+    <div className="mb-4">
+      <span className="mb-2 block text-sm font-medium">Login with</span>
+      <div
+        className="grid grid-cols-2 gap-1 rounded-lg border p-1"
+        style={{ borderColor: 'var(--border-color)' }}
+        role="tablist"
+        aria-label="Login source"
+      >
+        {(['local', 'kavita'] as const).map((src) => {
+          const active = loginSource === src;
+          const label = src === 'kavita' ? kavitaButtonLabel || 'Kavita' : 'Local';
+          return (
+            <button
+              key={src}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setLoginSource(src)}
+              disabled={isLoading}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                active ? 'bg-sky-700 text-white' : 'opacity-70 hover:opacity-100'
+              }`}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  ) : null;
 
   const displayError = oidcError || error;
 
@@ -310,11 +351,14 @@ export const LoginForm = ({
           )}
         </>
       ) : (
-        <PasswordLoginForm
-          onSubmit={handleSubmit}
-          isLoading={isLoading}
-          shouldFocusOnMount={autoFocus}
-        />
+        <>
+          {sourceSelector}
+          <PasswordLoginForm
+            onSubmit={handleSubmit}
+            isLoading={isLoading}
+            shouldFocusOnMount={autoFocus}
+          />
+        </>
       )}
     </div>
   );

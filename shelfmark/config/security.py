@@ -86,6 +86,7 @@ def security_settings() -> list[SettingsField]:
         {"label": "Proxy Authentication", "value": "proxy"},
         {"label": "OIDC (OpenID Connect)", "value": "oidc"},
         {"label": "Calibre-Web Database", "value": "cwa"},
+        {"label": "Kavita", "value": "kavita"},
     ]
 
     fields = [
@@ -142,6 +143,37 @@ def security_settings() -> list[SettingsField]:
             description="Configure local users and admin access in the Users tab.",
             style="primary",
             show_when={"field": "AUTH_METHOD", "value": ["builtin", "oidc"]},
+        ),
+        CustomComponentField(
+            key="kavita_setup_hint",
+            component="oidc_admin_hint",
+            label=(
+                "Configure the Kavita server URL and API key in the Kavita settings "
+                "tab. A local admin account is required as a fallback before Kavita "
+                "login activates; users can then sign in with Local or Kavita credentials."
+            ),
+            show_when=_auth_condition("kavita"),
+        ),
+        _auth_field(
+            SelectField,
+            "kavita",
+            key="KAVITA_DEFAULT_SOURCE",
+            label="Default Login Source",
+            description="Which source the login page selects by default.",
+            options=[
+                {"label": "Kavita", "value": "kavita"},
+                {"label": "Local", "value": "local"},
+            ],
+            default="kavita",
+        ),
+        _auth_field(
+            TextField,
+            "kavita",
+            key="KAVITA_LOGIN_BUTTON_LABEL",
+            label="Kavita Login Label",
+            description="Label shown for the Kavita option on the login page.",
+            placeholder="Sign in with Kavita",
+            default="",
         ),
         _auth_field(
             TextField,
