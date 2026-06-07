@@ -2380,6 +2380,8 @@ function App() {
         libraryUrl={config?.calibre_web_url || ''}
         audiobookLibraryUrl={config?.audiobook_library_url || ''}
         allowMissingType={config?.requests_allow_missing_type ?? true}
+        searchContentType={effectiveContentType}
+        combinedMode={combinedMode}
       >
       <div ref={headerRef} className="fixed top-0 right-0 left-0 z-40">
         <Header

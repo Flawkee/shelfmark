@@ -104,10 +104,9 @@ function RequestConfirmationModalSession({
   const [isClosing, setIsClosing] = useState(false);
 
   const isCombinedRequest = extraPayloads.length > 0;
-  const needsTypeChoice = requireType && !isCombinedRequest;
-  const [selectedType, setSelectedType] = useState<ContentType | null>(
-    payload.context.request_level === 'release' ? payload.context.content_type : null,
-  );
+  const showTypeBlock = requireType && !isCombinedRequest;
+  const requestedType: ContentType =
+    payload.context.content_type === 'audiobook' ? 'audiobook' : 'ebook';
 
   const handleClose = useCallback(() => {
     if (isSubmitting) {
@@ -185,9 +184,8 @@ function RequestConfirmationModalSession({
   if (!preview) return null;
 
   const titleId = 'request-confirmation-modal-title';
-  const typeMissing = needsTypeChoice && !selectedType;
   const confirmDisabled =
-    isSubmitting || typeMissing || (allowNotes && note.length > MAX_REQUEST_NOTE_LENGTH);
+    isSubmitting || (allowNotes && note.length > MAX_REQUEST_NOTE_LENGTH);
 
   const submit = async () => {
     if (confirmDisabled) {
@@ -197,13 +195,13 @@ function RequestConfirmationModalSession({
     setIsSubmitting(true);
     try {
       let nextPayload = applyRequestNoteToPayload(payload, note, allowNotes);
-      if (needsTypeChoice && selectedType) {
+      if (showTypeBlock) {
         nextPayload = {
           ...nextPayload,
-          book_data: { ...nextPayload.book_data, content_type: selectedType },
+          book_data: { ...nextPayload.book_data, content_type: requestedType },
           context: {
             ...nextPayload.context,
-            content_type: selectedType,
+            content_type: requestedType,
             type_selected: true,
           },
         };
@@ -322,38 +320,36 @@ function RequestConfirmationModalSession({
             </div>
           </div>
 
-          {needsTypeChoice && (
+          {showTypeBlock && (
             <div className="space-y-1">
-              <span className="text-sm font-medium">
-                Request type <span className="text-red-500">*</span>
-              </span>
+              <span className="text-sm font-medium">Request type</span>
               <div
                 className="grid grid-cols-2 gap-1 rounded-lg border border-(--border-muted) p-1"
                 role="radiogroup"
                 aria-label="Request type"
               >
                 {(['ebook', 'audiobook'] as const).map((type) => {
-                  const active = selectedType === type;
+                  const active = requestedType === type;
                   return (
-                    <button
+                    <span
                       key={type}
-                      type="button"
                       role="radio"
                       aria-checked={active}
-                      onClick={() => setSelectedType(type)}
-                      disabled={isSubmitting}
-                      className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                        active ? 'bg-sky-600 text-white' : 'opacity-70 hover:opacity-100'
+                      aria-disabled={!active}
+                      className={`rounded-md px-3 py-1.5 text-center text-sm font-medium ${
+                        active ? 'bg-sky-600 text-white' : 'cursor-not-allowed opacity-40'
                       }`}
                     >
                       {type === 'ebook' ? 'eBook' : 'Audiobook'}
-                    </button>
+                    </span>
                   );
                 })}
               </div>
-              {typeMissing && (
-                <p className="text-xs text-red-500">Choose eBook or Audiobook to continue.</p>
-              )}
+              <p className="text-xs opacity-60">
+                {requestedType === 'ebook'
+                  ? 'Requesting an eBook. To request the Audiobook edition, go back and pick Audiobooks from the content selector next to the search box.'
+                  : 'Requesting an Audiobook. To request the eBook edition, go back and pick Books from the content selector next to the search box.'}
+              </p>
             </div>
           )}
 

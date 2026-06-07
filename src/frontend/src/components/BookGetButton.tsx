@@ -66,8 +66,6 @@ interface InLibraryButtonProps {
   isIconVariant: boolean;
   fullWidth: boolean;
   size: ButtonSize;
-  className: string;
-  style?: CSSProperties;
 }
 
 const InLibraryButton = ({
@@ -77,8 +75,6 @@ const InLibraryButton = ({
   isIconVariant,
   fullWidth,
   size,
-  className,
-  style,
 }: InLibraryButtonProps) => {
   const toneClass = tone === 'ebook' ? 'bg-sky-600' : 'bg-violet-600';
   const iconSize = isIconVariant ? iconOnlySizes[size] : iconSizes[size];
@@ -87,7 +83,7 @@ const InLibraryButton = ({
 
   if (isIconVariant) {
     const base =
-      `flex items-center justify-center rounded-full text-white ${toneClass} ${iconSizeClasses[size]} ${className}`.trim();
+      `flex items-center justify-center rounded-full text-white ${toneClass} ${iconSizeClasses[size]}`.trim();
     if (clickable) {
       return (
         <a
@@ -95,7 +91,6 @@ const InLibraryButton = ({
           target="_blank"
           rel="noopener noreferrer"
           className={base}
-          style={style}
           aria-label={label}
           title={label}
         >
@@ -104,19 +99,14 @@ const InLibraryButton = ({
       );
     }
     return (
-      <span
-        className={`${base} cursor-not-allowed opacity-80`}
-        style={style}
-        aria-label={label}
-        title={label}
-      >
+      <span className={`${base} cursor-not-allowed opacity-80`} aria-label={label} title={label}>
         <Icon className={iconSize} />
       </span>
     );
   }
 
   const base =
-    `inline-flex items-center justify-center gap-1.5 rounded-sm text-white ${toneClass} ${sizeClasses[size]} ${fullWidth ? 'w-full' : ''} ${className}`.trim();
+    `inline-flex items-center justify-center gap-1.5 rounded-sm text-white ${toneClass} ${sizeClasses[size]} ${fullWidth ? 'w-full' : ''}`.trim();
   if (clickable) {
     return (
       <a
@@ -124,7 +114,6 @@ const InLibraryButton = ({
         target="_blank"
         rel="noopener noreferrer"
         className={`${base} transition-colors hover:opacity-90`}
-        style={style}
         title={label}
       >
         <Icon className={iconSize} />
@@ -133,7 +122,7 @@ const InLibraryButton = ({
     );
   }
   return (
-    <span className={`${base} cursor-not-allowed opacity-80`} style={style} title={label}>
+    <span className={`${base} cursor-not-allowed opacity-80`} title={label}>
       <Icon className={iconSize} />
       <span>{label}</span>
     </span>
@@ -151,7 +140,8 @@ export const BookGetButton = ({
   className = '',
   style,
 }: BookGetButtonProps) => {
-  const { libraryUrl, audiobookLibraryUrl, allowMissingType } = useLibraryAvailability();
+  const { libraryUrl, audiobookLibraryUrl, searchContentType, combinedMode } =
+    useLibraryAvailability();
   const isIconVariant = variant === 'icon';
   const widthClasses = fullWidth ? 'w-full' : '';
   const sizeClass = isIconVariant ? iconSizeClasses[size] : sizeClasses[size];
@@ -159,9 +149,16 @@ export const BookGetButton = ({
 
   const ebookInLibrary = Boolean(book.kavita_available);
   const audioInLibrary = Boolean(book.audiobookshelf_available);
-  const anyInLibrary = ebookInLibrary || audioInLibrary;
-  const exactlyOne = ebookInLibrary !== audioInLibrary;
-  const showGet = !anyInLibrary || (exactlyOne && allowMissingType);
+  const searchedInLibrary = combinedMode
+    ? ebookInLibrary && audioInLibrary
+    : searchContentType === 'audiobook'
+      ? audioInLibrary
+      : ebookInLibrary;
+
+  // In-library action buttons only show for the content type currently searched.
+  const showEbookButton = ebookInLibrary && (combinedMode || searchContentType === 'ebook');
+  const showAudioButton = audioInLibrary && (combinedMode || searchContentType === 'audiobook');
+  const anyLibraryButton = showEbookButton || showAudioButton;
 
   const isCompleted = buttonState?.state === 'complete';
   const hasError = buttonState?.state === 'error';
@@ -171,6 +168,11 @@ export const BookGetButton = ({
   const showCircularProgress =
     buttonState?.state === 'downloading' && buttonState.progress !== undefined;
   const showSpinner = (isInProgress && !showCircularProgress) || isLoading;
+
+  // Show Get only when the searched content type isn't already in the library,
+  // or when an active download/error state needs to stay visible.
+  const hasActiveState = Boolean(buttonState && buttonState.state !== 'download');
+  const showGet = !searchedInLibrary || hasActiveState;
 
   const isDisabled = isLoading || isBlocked;
 
@@ -284,10 +286,10 @@ export const BookGetButton = ({
   const getButton = isIconVariant ? (
     <button
       type="button"
-      className={`flex items-center justify-center rounded-full transition-all duration-200 focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:outline-hidden ${sizeClass} ${getButtonClasses()} ${anyInLibrary ? '' : className}`.trim()}
+      className={`flex items-center justify-center rounded-full transition-all duration-200 focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:outline-hidden ${sizeClass} ${getButtonClasses()} ${anyLibraryButton ? '' : className}`.trim()}
       onClick={handleClick}
       disabled={isDisabled}
-      style={anyInLibrary ? undefined : style}
+      style={anyLibraryButton ? undefined : style}
       aria-label={`${getDisplayText()} releases for ${book.title}`}
     >
       {renderIcon()}
@@ -295,10 +297,10 @@ export const BookGetButton = ({
   ) : (
     <button
       type="button"
-      className={`inline-flex items-center justify-center gap-1.5 rounded-sm text-white transition-all duration-200 focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:outline-hidden ${sizeClass} ${widthClasses} ${getButtonClasses()} ${anyInLibrary ? '' : className}`.trim()}
+      className={`inline-flex items-center justify-center gap-1.5 rounded-sm text-white transition-all duration-200 focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:outline-hidden ${sizeClass} ${widthClasses} ${getButtonClasses()} ${anyLibraryButton ? '' : className}`.trim()}
       onClick={handleClick}
       disabled={isDisabled}
-      style={anyInLibrary ? undefined : style}
+      style={anyLibraryButton ? undefined : style}
       aria-label={`${getDisplayText()} releases for ${book.title}`}
     >
       {renderIcon()}
@@ -306,7 +308,7 @@ export const BookGetButton = ({
     </button>
   );
 
-  if (!anyInLibrary) {
+  if (!anyLibraryButton) {
     return getButton;
   }
 
@@ -315,7 +317,7 @@ export const BookGetButton = ({
       className={`flex ${isIconVariant ? 'flex-row items-center' : 'flex-col'} gap-1.5 ${fullWidth ? 'w-full' : ''} ${className}`.trim()}
       style={style}
     >
-      {ebookInLibrary && (
+      {showEbookButton && (
         <InLibraryButton
           label="eBook in Library"
           url={libraryUrl}
@@ -323,10 +325,9 @@ export const BookGetButton = ({
           isIconVariant={isIconVariant}
           fullWidth={fullWidth}
           size={size}
-          className=""
         />
       )}
-      {audioInLibrary && (
+      {showAudioButton && (
         <InLibraryButton
           label="AudioBook in Library"
           url={audiobookLibraryUrl}
@@ -334,7 +335,6 @@ export const BookGetButton = ({
           isIconVariant={isIconVariant}
           fullWidth={fullWidth}
           size={size}
-          className=""
         />
       )}
       {showGet && getButton}
