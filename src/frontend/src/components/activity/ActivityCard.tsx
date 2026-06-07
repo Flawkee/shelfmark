@@ -793,6 +793,17 @@ export const ActivityCard = ({
           )}
 
           <div className="mt-1.5 flex min-w-0 items-center gap-2">
+            {reviewRecord && (
+              <span
+                className={`inline-block max-w-full truncate rounded-md px-2 py-0.5 text-[11px] font-medium ${
+                  reviewRecord.content_type === 'audiobook'
+                    ? 'bg-violet-500/15 text-violet-600 dark:text-violet-400'
+                    : 'bg-sky-500/15 text-sky-600 dark:text-sky-400'
+                }`}
+              >
+                {reviewRecord.content_type === 'audiobook' ? 'Audiobook' : 'eBook'}
+              </span>
+            )}
             {model.badges.map((badge, index) => {
               const badgeId = `${badge.key}-${index}`;
               const badgeStyle = STATUS_BADGE_STYLES[badge.visualStatus];

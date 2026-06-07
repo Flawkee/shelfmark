@@ -296,6 +296,82 @@ def _resolve_request_user_context(
     return target_user_id, target_username, f"{actor_label} on behalf of {target_label}"
 
 
+def _book_data_author(book_data: dict[str, Any]) -> Any:
+    authors = book_data.get("authors")
+    if isinstance(authors, list) and authors:
+        return authors[0]
+    return book_data.get("author") or book_data.get("search_author")
+
+
+def _ebook_in_library(book_data: dict[str, Any]) -> bool:
+    from shelfmark.core.kavita_inventory_service import get_inventory_service
+
+    inventory = get_inventory_service()
+    if inventory is None:
+        return False
+    try:
+        return inventory.lookup_book(
+            isbn_13=book_data.get("isbn_13"),
+            isbn_10=book_data.get("isbn_10"),
+            title=book_data.get("search_title") or book_data.get("title"),
+            author=_book_data_author(book_data),
+            series_name=book_data.get("series_name"),
+            series_index=book_data.get("series_position"),
+            raw_title=book_data.get("title"),
+        )
+    except Exception:  # noqa: BLE001 - availability never blocks the request path
+        return False
+
+
+def _audiobook_in_library(book_data: dict[str, Any]) -> bool:
+    from shelfmark.core.audiobookshelf_inventory_service import get_abs_inventory_service
+
+    inventory = get_abs_inventory_service()
+    if inventory is None:
+        return False
+    try:
+        return inventory.lookup_audiobook(
+            isbn_13=book_data.get("isbn_13"),
+            isbn_10=book_data.get("isbn_10"),
+            title=book_data.get("search_title") or book_data.get("title"),
+            author=_book_data_author(book_data),
+            series_name=book_data.get("series_name"),
+            series_index=book_data.get("series_position"),
+            raw_title=book_data.get("title"),
+        )
+    except Exception:  # noqa: BLE001 - availability never blocks the request path
+        return False
+
+
+def _enforce_request_type_rules(
+    *,
+    effective: dict[str, Any],
+    context: dict[str, Any],
+    content_type: str,
+    book_data: dict[str, Any],
+) -> None:
+    if coerce_bool(effective.get("REQUESTS_REQUIRE_TYPE"), default=False) and not coerce_bool(
+        context.get("type_selected"), default=False
+    ):
+        msg = "Please choose eBook or Audiobook for this request."
+        raise RequestServiceError(msg, status_code=400, code="request_type_required")
+
+    allow_missing = coerce_bool(effective.get("REQUESTS_ALLOW_MISSING_TYPE"), default=True)
+    own_in = _audiobook_in_library(book_data) if content_type == "audiobook" else _ebook_in_library(
+        book_data
+    )
+    if own_in:
+        msg = "This title is already in your library."
+        raise RequestServiceError(msg, status_code=409, code="already_in_library")
+    if not allow_missing:
+        other_in = _ebook_in_library(book_data) if content_type == "audiobook" else (
+            _audiobook_in_library(book_data)
+        )
+        if other_in:
+            msg = "This title is already in your library in another format."
+            raise RequestServiceError(msg, status_code=409, code="other_format_in_library")
+
+
 def _prepare_request_create_arguments(
     user_db: UserDB,
     data: dict[str, Any],
@@ -408,6 +484,13 @@ def _prepare_request_create_arguments(
             code="policy_requires_request",
             required_mode=PolicyMode.REQUEST_BOOK.value,
         )
+
+    _enforce_request_type_rules(
+        effective=effective,
+        context=context,
+        content_type=content_type,
+        book_data=book_data,
+    )
 
     return {
         "create_args": {

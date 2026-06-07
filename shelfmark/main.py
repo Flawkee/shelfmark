@@ -53,6 +53,10 @@ from shelfmark.core.kavita_inventory_service import (
     get_inventory_service,
     init_inventory_service,
 )
+from shelfmark.core.audiobookshelf_inventory_service import (
+    get_abs_inventory_service,
+    init_abs_inventory_service,
+)
 from shelfmark.core.external_user_linking import upsert_external_user
 from shelfmark.integrations.kavita.client import KavitaError, kavita_login_user
 from shelfmark.core.logger import setup_logger
@@ -185,6 +189,7 @@ try:
     download_history_service = DownloadHistoryService(_user_db_path)
     activity_view_state_service = ActivityViewStateService(_user_db_path)
     init_inventory_service(_user_db_path)
+    init_abs_inventory_service(_user_db_path)
     import_module("shelfmark.config.users_settings")
     from shelfmark.core.admin_routes import register_admin_routes
     from shelfmark.core.oidc_routes import register_oidc_routes
@@ -212,6 +217,13 @@ try:
     _start_kavita_scheduler()
 except Exception as _kavita_sched_exc:  # noqa: BLE001 - scheduler must never block startup
     logger.warning("Failed to start Kavita scheduler: %s", _kavita_sched_exc)
+
+try:
+    from shelfmark.integrations.audiobookshelf.scheduler import start_scheduler as _start_abs_scheduler
+
+    _start_abs_scheduler()
+except Exception as _abs_sched_exc:  # noqa: BLE001 - scheduler must never block startup
+    logger.warning("Failed to start Audiobookshelf scheduler: %s", _abs_sched_exc)
 
 # Rate limiting for login attempts
 # Map usernames to their failed-attempt counters and lockout timestamps.
@@ -1159,6 +1171,10 @@ def api_config() -> Response | tuple[Response, int]:
         config = {
             "calibre_web_url": app_config.get("CALIBRE_WEB_URL", ""),
             "audiobook_library_url": app_config.get("AUDIOBOOK_LIBRARY_URL", ""),
+            "requests_require_type": coerce_bool(app_config.get("REQUESTS_REQUIRE_TYPE", False)),
+            "requests_allow_missing_type": coerce_bool(
+                app_config.get("REQUESTS_ALLOW_MISSING_TYPE", True)
+            ),
             "search_page_title": app_config.get("SEARCH_PAGE_TITLE", "Shelfmark"),
             "debug": app_config.get("DEBUG", False),
             "build_version": BUILD_VERSION,
@@ -1397,6 +1413,14 @@ def _record_download_terminal_snapshot(task_id: str, status: QueueStatus, task: 
             request_sync_after_download()
         except Exception as exc:  # noqa: BLE001 - never break the download pipeline
             logger.debug("Could not schedule post-download Kavita sync: %s", exc)
+        try:
+            from shelfmark.integrations.audiobookshelf.scheduler import (
+                request_sync_after_download as request_abs_sync_after_download,
+            )
+
+            request_abs_sync_after_download()
+        except Exception as exc:  # noqa: BLE001 - never break the download pipeline
+            logger.debug("Could not schedule post-download Audiobookshelf sync: %s", exc)
 
     final_status = _queue_status_to_final_activity_status(status)
     if final_status is None:
@@ -2586,6 +2610,34 @@ def _annotate_kavita_availability(books_data: list[dict[str, Any]]) -> None:
             continue
 
 
+def _annotate_audiobookshelf_availability(books_data: list[dict[str, Any]]) -> None:
+    """Flag search results already present in Audiobookshelf as audiobooks."""
+    inventory = get_abs_inventory_service()
+    if inventory is None or not books_data:
+        return
+    try:
+        if inventory.count() == 0:
+            return
+    except Exception:  # noqa: BLE001 - availability must never break search
+        return
+
+    for book in books_data:
+        try:
+            authors = book.get("authors") or []
+            author = authors[0] if authors else book.get("search_author")
+            book["audiobookshelf_available"] = inventory.lookup_audiobook(
+                isbn_13=book.get("isbn_13"),
+                isbn_10=book.get("isbn_10"),
+                title=book.get("search_title") or book.get("title"),
+                author=author,
+                series_name=book.get("series_name"),
+                series_index=book.get("series_position"),
+                raw_title=book.get("title"),
+            )
+        except Exception:  # noqa: BLE001 - skip annotation for this book on error
+            continue
+
+
 @app.route("/api/metadata/search", methods=["GET"])
 @login_required
 def api_metadata_search() -> Response | tuple[Response, int]:
@@ -2714,6 +2766,7 @@ def api_metadata_search() -> Response | tuple[Response, int]:
                 book_dict["cover_url"] = transform_cover_url(book_dict["cover_url"], cache_id)
 
         _annotate_kavita_availability(books_data)
+        _annotate_audiobookshelf_availability(books_data)
 
         response_data = {
             "books": books_data,
@@ -3241,6 +3294,7 @@ def api_settings_get_all() -> Response | tuple[Response, int]:
         import_module("shelfmark.config.settings")
         import_module("shelfmark.config.users_settings")
         import_module("shelfmark.config.kavita_settings")
+        import_module("shelfmark.config.audiobookshelf_settings")
         from shelfmark.core.settings_registry import serialize_all_settings
 
         data = serialize_all_settings(include_values=True)
@@ -3270,6 +3324,7 @@ def api_settings_get_tab(tab_name: str) -> Response | tuple[Response, int]:
         import_module("shelfmark.config.settings")
         import_module("shelfmark.config.users_settings")
         import_module("shelfmark.config.kavita_settings")
+        import_module("shelfmark.config.audiobookshelf_settings")
         from shelfmark.core.settings_registry import (
             get_settings_tab,
             serialize_tab,
@@ -3308,6 +3363,7 @@ def api_settings_update_tab(tab_name: str) -> Response | tuple[Response, int]:
         import_module("shelfmark.config.settings")
         import_module("shelfmark.config.users_settings")
         import_module("shelfmark.config.kavita_settings")
+        import_module("shelfmark.config.audiobookshelf_settings")
         from shelfmark.core.settings_registry import (
             get_settings_tab,
             update_settings,
@@ -3359,6 +3415,7 @@ def api_settings_execute_action(tab_name: str, action_key: str) -> Response | tu
         import_module("shelfmark.config.settings")
         import_module("shelfmark.config.users_settings")
         import_module("shelfmark.config.kavita_settings")
+        import_module("shelfmark.config.audiobookshelf_settings")
         from shelfmark.core.settings_registry import execute_action
 
         # Get current form values if provided (for testing with unsaved values)

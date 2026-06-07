@@ -4,7 +4,7 @@ import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 import { useMountEffect } from '../hooks/useMountEffect';
 import { getMetadataBookInfo } from '../services/api';
-import type { CreateRequestPayload } from '../types';
+import type { ContentType, CreateRequestPayload } from '../types';
 import type { RequestConfirmationPreview } from '../utils/requestConfirmation';
 import {
   applyRequestNoteToPayload,
@@ -19,6 +19,7 @@ interface RequestConfirmationModalProps {
   payload: CreateRequestPayload | null;
   extraPayloads?: CreateRequestPayload[];
   allowNotes: boolean;
+  requireType?: boolean;
   onConfirm: (
     payload: CreateRequestPayload,
     extraPayloads?: CreateRequestPayload[],
@@ -30,6 +31,7 @@ interface RequestConfirmationModalSessionProps {
   payload: CreateRequestPayload;
   extraPayloads?: CreateRequestPayload[];
   allowNotes: boolean;
+  requireType?: boolean;
   onConfirm: (
     payload: CreateRequestPayload,
     extraPayloads?: CreateRequestPayload[],
@@ -68,6 +70,7 @@ export function RequestConfirmationModal({
   payload,
   extraPayloads = [],
   allowNotes,
+  requireType = false,
   onConfirm,
   onClose,
 }: RequestConfirmationModalProps) {
@@ -81,6 +84,7 @@ export function RequestConfirmationModal({
       payload={payload}
       extraPayloads={extraPayloads}
       allowNotes={allowNotes}
+      requireType={requireType}
       onConfirm={onConfirm}
       onClose={onClose}
     />
@@ -91,12 +95,19 @@ function RequestConfirmationModalSession({
   payload,
   extraPayloads = [],
   allowNotes,
+  requireType = false,
   onConfirm,
   onClose,
 }: RequestConfirmationModalSessionProps) {
   const [note, setNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
+
+  const isCombinedRequest = extraPayloads.length > 0;
+  const needsTypeChoice = requireType && !isCombinedRequest;
+  const [selectedType, setSelectedType] = useState<ContentType | null>(
+    payload.context.request_level === 'release' ? payload.context.content_type : null,
+  );
 
   const handleClose = useCallback(() => {
     if (isSubmitting) {
@@ -174,7 +185,9 @@ function RequestConfirmationModalSession({
   if (!preview) return null;
 
   const titleId = 'request-confirmation-modal-title';
-  const confirmDisabled = isSubmitting || (allowNotes && note.length > MAX_REQUEST_NOTE_LENGTH);
+  const typeMissing = needsTypeChoice && !selectedType;
+  const confirmDisabled =
+    isSubmitting || typeMissing || (allowNotes && note.length > MAX_REQUEST_NOTE_LENGTH);
 
   const submit = async () => {
     if (confirmDisabled) {
@@ -183,7 +196,18 @@ function RequestConfirmationModalSession({
 
     setIsSubmitting(true);
     try {
-      const nextPayload = applyRequestNoteToPayload(payload, note, allowNotes);
+      let nextPayload = applyRequestNoteToPayload(payload, note, allowNotes);
+      if (needsTypeChoice && selectedType) {
+        nextPayload = {
+          ...nextPayload,
+          book_data: { ...nextPayload.book_data, content_type: selectedType },
+          context: {
+            ...nextPayload.context,
+            content_type: selectedType,
+            type_selected: true,
+          },
+        };
+      }
       const success = await onConfirm(
         nextPayload,
         extraPayloads.length > 0 ? extraPayloads : undefined,
@@ -297,6 +321,41 @@ function RequestConfirmationModalSession({
               </div>
             </div>
           </div>
+
+          {needsTypeChoice && (
+            <div className="space-y-1">
+              <span className="text-sm font-medium">
+                Request type <span className="text-red-500">*</span>
+              </span>
+              <div
+                className="grid grid-cols-2 gap-1 rounded-lg border border-(--border-muted) p-1"
+                role="radiogroup"
+                aria-label="Request type"
+              >
+                {(['ebook', 'audiobook'] as const).map((type) => {
+                  const active = selectedType === type;
+                  return (
+                    <button
+                      key={type}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => setSelectedType(type)}
+                      disabled={isSubmitting}
+                      className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                        active ? 'bg-sky-600 text-white' : 'opacity-70 hover:opacity-100'
+                      }`}
+                    >
+                      {type === 'ebook' ? 'eBook' : 'Audiobook'}
+                    </button>
+                  );
+                })}
+              </div>
+              {typeMissing && (
+                <p className="text-xs text-red-500">Choose eBook or Audiobook to continue.</p>
+              )}
+            </div>
+          )}
 
           {allowNotes && (
             <div className="space-y-1">

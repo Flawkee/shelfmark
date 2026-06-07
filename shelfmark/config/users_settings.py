@@ -408,4 +408,23 @@ def users_settings() -> list[SettingsField]:
             user_overridable=True,
             show_when={"field": "REQUESTS_ENABLED", "value": True},
         ),
+        CheckboxField(
+            key="REQUESTS_REQUIRE_TYPE",
+            label="Require request type",
+            description=(
+                "Make users explicitly choose eBook or Audiobook when submitting a request."
+            ),
+            default=False,
+            show_when={"field": "REQUESTS_ENABLED", "value": True},
+        ),
+        CheckboxField(
+            key="REQUESTS_ALLOW_MISSING_TYPE",
+            label="Allow requesting types not in your library",
+            description=(
+                "Let users request a type (eBook or Audiobook) that isn't in their "
+                "Kavita/Audiobookshelf library yet, even when the other type already is."
+            ),
+            default=True,
+            show_when={"field": "REQUESTS_ENABLED", "value": True},
+        ),
     ]

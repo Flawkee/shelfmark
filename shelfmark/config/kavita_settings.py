@@ -32,23 +32,34 @@ from shelfmark.integrations.kavita.sync import build_kavita_config, run_kavita_s
 
 logger = setup_logger(__name__)
 
+_KAVITA_OPTIONS_CACHE: dict[str, Any] = {"key": None, "options": []}
 
-def get_kavita_library_options() -> list[dict[str, Any]]:
-    """Fetch Kavita libraries as select options from saved config."""
-    cfg = build_kavita_config()
-    if not cfg.base_url or not cfg.api_key:
-        return []
-    try:
-        token = kavita_authenticate_plugin(cfg)
-        libraries = kavita_list_libraries(cfg, token)
-    except KavitaError:
-        logger.debug("Failed to fetch Kavita libraries for options")
-        return []
+
+def _kavita_options_from_libraries(libraries: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [
         {"value": str(lib["id"]), "label": str(lib.get("name") or f"Library {lib['id']}")}
         for lib in libraries
         if lib.get("id") is not None
     ]
+
+
+def get_kavita_library_options() -> list[dict[str, Any]]:
+    """Fetch Kavita libraries as select options.
+
+    Falls back to the last options cached by a successful Test Connection so the
+    multiselect populates before the connection details are saved.
+    """
+    cfg = build_kavita_config()
+    if not cfg.base_url or not cfg.api_key:
+        return _KAVITA_OPTIONS_CACHE.get("options", [])
+    try:
+        token = kavita_authenticate_plugin(cfg)
+        options = _kavita_options_from_libraries(kavita_list_libraries(cfg, token))
+    except KavitaError:
+        logger.debug("Failed to fetch Kavita libraries for options")
+        return _KAVITA_OPTIONS_CACHE.get("options", [])
+    _KAVITA_OPTIONS_CACHE.update({"key": f"{cfg.base_url}|{cfg.api_key}", "options": options})
+    return options
 
 
 def check_kavita_connection(current_values: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -63,6 +74,9 @@ def check_kavita_connection(current_values: dict[str, Any] | None = None) -> dic
         libraries = kavita_list_libraries(cfg, token)
     except KavitaError as exc:
         return {"success": False, "message": str(exc)}
+    _KAVITA_OPTIONS_CACHE.update(
+        {"key": f"{cfg.base_url}|{cfg.api_key}", "options": _kavita_options_from_libraries(libraries)}
+    )
     return {
         "success": True,
         "message": f"Connected to Kavita ({len(libraries)} libraries)",

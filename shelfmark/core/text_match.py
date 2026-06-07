@@ -12,14 +12,20 @@ import unicodedata
 _LEADING_ARTICLES = ("the ", "a ", "an ")
 _NON_ALNUM = re.compile(r"[^a-z0-9]+")
 _WHITESPACE = re.compile(r"\s+")
+_BRACKETED = re.compile(r"\([^)]*\)|\[[^\]]*\]|\{[^}]*\}")
 
 
 def _fold(value: object) -> str:
-    """Lowercase, strip accents, drop punctuation, collapse whitespace."""
+    """Lowercase, strip accents, drop bracketed qualifiers and punctuation.
+
+    Bracketed segments like "(Unabridged)", "(2020)", or "(Digital)" are
+    dropped so library titles line up with provider search titles.
+    """
     text = str(value or "")
     text = unicodedata.normalize("NFKD", text)
     text = "".join(ch for ch in text if not unicodedata.combining(ch))
     text = text.lower()
+    text = _BRACKETED.sub(" ", text)
     text = _NON_ALNUM.sub(" ", text)
     return _WHITESPACE.sub(" ", text).strip()
 

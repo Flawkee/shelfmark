@@ -72,6 +72,7 @@ class NotificationEvent(StrEnum):
     DOWNLOAD_COMPLETE = "download_complete"
     DOWNLOAD_FAILED = "download_failed"
     LIBRARY_AVAILABLE = "library_available"
+    AUDIOBOOK_LIBRARY_AVAILABLE = "audiobook_library_available"
 
 
 @dataclass
@@ -328,6 +329,7 @@ def _resolve_notify_type(event: NotificationEvent) -> object:
             NotificationEvent.DOWNLOAD_COMPLETE: "success",
             NotificationEvent.DOWNLOAD_FAILED: "failure",
             NotificationEvent.LIBRARY_AVAILABLE: "info",
+            NotificationEvent.AUDIOBOOK_LIBRARY_AVAILABLE: "info",
         }
         return fallback[event]
 
@@ -338,6 +340,7 @@ def _resolve_notify_type(event: NotificationEvent) -> object:
         NotificationEvent.DOWNLOAD_COMPLETE: apprise.NotifyType.SUCCESS,
         NotificationEvent.DOWNLOAD_FAILED: apprise.NotifyType.FAILURE,
         NotificationEvent.LIBRARY_AVAILABLE: apprise.NotifyType.INFO,
+        NotificationEvent.AUDIOBOOK_LIBRARY_AVAILABLE: apprise.NotifyType.INFO,
     }
     return mapping[event]
 
@@ -368,7 +371,13 @@ def _render_message(context: NotificationContext) -> tuple[str, str]:
         return "Download Complete", f'"{title}" by {author} downloaded successfully.'
     if event == NotificationEvent.LIBRARY_AVAILABLE:
         by_author = f" by {author}" if author != "Unknown author" else ""
-        return "Available in Library", f'"{title}"{by_author} is now available in your library.'
+        return "eBook Added to Library", f'"{title}"{by_author} was added to your eBook library.'
+    if event == NotificationEvent.AUDIOBOOK_LIBRARY_AVAILABLE:
+        by_author = f" by {author}" if author != "Unknown author" else ""
+        return (
+            "Audiobook Added to Library",
+            f'"{title}"{by_author} was added to your audiobook library.',
+        )
 
     error_message = _clean_text(context.error_message, "")
     error_line = f"\nError: {error_message}" if error_message else ""

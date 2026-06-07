@@ -58,6 +58,7 @@ export interface Book {
   retry_available?: boolean;
   kavita_available?: boolean;
   kavita_series_owned?: number;
+  audiobookshelf_available?: boolean;
 }
 
 // Status response types
@@ -210,6 +211,7 @@ export interface RequestContextPayload {
   source: string;
   content_type: ContentType;
   request_level: 'book' | 'release';
+  type_selected?: boolean;
 }
 
 export interface CreateRequestPayload {
@@ -267,6 +269,8 @@ export type BooksOutputMode = 'folder' | 'booklore' | 'email';
 export interface AppConfig {
   calibre_web_url: string;
   audiobook_library_url: string;
+  requests_require_type?: boolean;
+  requests_allow_missing_type?: boolean;
   search_page_title: string;
   debug: boolean;
   build_version: string;

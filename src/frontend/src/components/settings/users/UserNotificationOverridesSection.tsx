@@ -33,7 +33,8 @@ const USER_ROUTE_EVENT_OPTIONS = [
   { value: 'request_rejected', label: 'Request rejected' },
   { value: 'download_complete', label: 'Download complete' },
   { value: 'download_failed', label: 'Download failed' },
-  { value: 'library_available', label: 'Available in Library' },
+  { value: 'library_available', label: 'eBook Added to Library' },
+  { value: 'audiobook_library_available', label: 'Audiobook Added to Library' },
 ];
 const ALLOWED_ROUTE_EVENTS = new Set(USER_ROUTE_EVENT_OPTIONS.map((option) => option.value));
 const ROUTE_EVENT_ORDER = new Map(
