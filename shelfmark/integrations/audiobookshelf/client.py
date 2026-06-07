@@ -44,6 +44,7 @@ def _request(
     action: str,
     headers: dict[str, str] | None = None,
     params: dict[str, Any] | None = None,
+    json_body: Any = None,
 ) -> requests.Response:
     try:
         response = requests.request(
@@ -51,6 +52,7 @@ def _request(
             url,
             headers=headers,
             params=params,
+            json=json_body,
             timeout=_TIMEOUT,
             verify=verify_tls,
         )
@@ -202,3 +204,67 @@ def abs_iter_inventory(cfg: AbsConfig, library_ids: list[int]) -> Iterator[dict[
                 "isbn_10": isbn_10,
                 "series_index": series_index,
             }
+
+
+def abs_list_users(cfg: AbsConfig) -> list[dict[str, Any]]:
+    """Return Audiobookshelf users (requires an admin API key)."""
+    url = f"{cfg.base_url}/api/users"
+    response = _request(
+        "GET", url, verify_tls=cfg.verify_tls, action="users", headers=_auth_headers(cfg)
+    )
+    if response.status_code in {401, 403}:
+        msg = f"{ABS_DISPLAY_NAME} authentication failed (admin API key required)"
+        raise AbsError(msg)
+    try:
+        response.raise_for_status()
+    except requests.exceptions.HTTPError as exc:
+        msg = f"Failed to fetch {ABS_DISPLAY_NAME} users ({response.status_code})"
+        raise AbsError(msg) from exc
+    data = _json(response, "users")
+    users = data.get("users") if isinstance(data, dict) else None
+    return [u for u in users if isinstance(u, dict)] if isinstance(users, list) else []
+
+
+def abs_user_exists(cfg: AbsConfig, username: str) -> bool:
+    """Return True if a user with *username* already exists (case-insensitive)."""
+    target = (username or "").strip().lower()
+    if not target:
+        return False
+    return any(str(u.get("username") or "").strip().lower() == target for u in abs_list_users(cfg))
+
+
+def abs_create_user(cfg: AbsConfig, username: str, password: str) -> None:
+    """Create a standard Audiobookshelf user with download/library access."""
+    url = f"{cfg.base_url}/api/users"
+    payload = {
+        "username": username,
+        "password": password,
+        "type": "user",
+        "isActive": True,
+        "permissions": {
+            "download": True,
+            "update": False,
+            "delete": False,
+            "upload": False,
+            "accessAllLibraries": True,
+            "accessAllTags": True,
+            "accessExplicitContent": True,
+            "createEreader": False,
+        },
+    }
+    response = _request(
+        "POST",
+        url,
+        verify_tls=cfg.verify_tls,
+        action="create user",
+        headers=_auth_headers(cfg),
+        json_body=payload,
+    )
+    if response.status_code in {401, 403}:
+        msg = f"{ABS_DISPLAY_NAME} authentication failed (admin API key required)"
+        raise AbsError(msg)
+    try:
+        response.raise_for_status()
+    except requests.exceptions.HTTPError as exc:
+        msg = f"Failed to create {ABS_DISPLAY_NAME} user ({response.status_code})"
+        raise AbsError(msg) from exc

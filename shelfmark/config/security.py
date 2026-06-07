@@ -176,6 +176,28 @@ def security_settings() -> list[SettingsField]:
             default="",
         ),
         _auth_field(
+            CheckboxField,
+            "kavita",
+            key="KAVITA_PROVISION_ABS_USERS",
+            label="Auto-provision Audiobookshelf users",
+            description=(
+                "On a successful Kavita login, create the user in Audiobookshelf if missing "
+                "(Account Type User; Can Download, Access All Libraries, Access All Tags, "
+                "Access Explicit Content). Requires a configured, reachable Audiobookshelf and "
+                "never blocks login."
+            ),
+            default=False,
+        ),
+        CustomComponentField(
+            key="kavita_abs_provision_hint",
+            component="oidc_admin_hint",
+            label=(
+                "Auto-provisioning needs Audiobookshelf set up first: configure its URL and API "
+                "key in the Audiobookshelf settings tab and test the connection before enabling."
+            ),
+            show_when=_auth_condition("kavita"),
+        ),
+        _auth_field(
             TextField,
             "proxy",
             key="PROXY_AUTH_USER_HEADER",

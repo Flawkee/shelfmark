@@ -90,7 +90,7 @@ def trigger_abs_sync_now(current_values: dict[str, Any] | None = None) -> dict[s
     }
 
 
-@register_settings("audiobookshelf", "Audiobookshelf", icon="headphones", order=7)
+@register_settings("audiobookshelf", "Audiobookshelf", icon="headphones", order=8)
 def audiobookshelf_settings() -> list[SettingsField]:
     """Audiobookshelf connection and library-sync settings."""
     return [

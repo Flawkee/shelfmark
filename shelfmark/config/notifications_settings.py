@@ -266,7 +266,7 @@ def _test_admin_notification_action(current_values: dict[str, Any]) -> dict[str,
 register_on_save("notifications", _on_save_notifications)
 
 
-@register_settings("notifications", "Notifications", icon="bell", order=7)
+@register_settings("notifications", "Notifications", icon="bell", order=9)
 def notifications_settings() -> list[SettingsField]:
     """Global notifications settings."""
     return [

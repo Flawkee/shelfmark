@@ -97,7 +97,7 @@ def trigger_kavita_sync_now(current_values: dict[str, Any] | None = None) -> dic
     }
 
 
-@register_settings("kavita", "Kavita", icon="book-open", order=6)
+@register_settings("kavita", "Kavita", icon="book-open", order=7)
 def kavita_settings() -> list[SettingsField]:
     """Kavita connection and library-sync settings."""
     return [

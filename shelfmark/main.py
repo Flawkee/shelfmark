@@ -2282,6 +2282,13 @@ def api_login() -> Response | tuple[Response, int]:
                 logger.warning("Kavita login failed for '%s' from IP %s: %s", username, ip_address, exc)
                 return _failed_login_response(username, ip_address)
 
+            try:
+                from shelfmark.integrations.audiobookshelf.provisioning import provision_abs_user
+
+                provision_abs_user(username, password)
+            except Exception as exc:  # noqa: BLE001 - never block login on provisioning
+                logger.warning("Audiobookshelf provisioning hook error for '%s': %s", username, exc)
+
             db_user, _ = upsert_external_user(
                 user_db,
                 auth_source="kavita",
