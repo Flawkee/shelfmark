@@ -25,13 +25,14 @@ This fork connects Shelfmark to your reading servers so you stop requesting book
 
 ### Kavita SSO
 - Sign in with your Kavita account. A login-page source selector (Local / Kavita, admin-set default) lets local and Kavita users coexist; Kavita logins auto-provision a linked Shelfmark user, and admins keep full control over each user's role.
+- **Audiobookshelf auto-provisioning** *(admin, off by default)* — on a successful Kavita login, create the same user in Audiobookshelf if they don't exist yet (Account Type *User*; Can Download, Access All Libraries, Access All Tags, Access Explicit Content), using the credentials that just passed Kavita SSO. Can only be enabled once Audiobookshelf is configured and reachable, and it's strictly best-effort — any Audiobookshelf failure never blocks the Kavita login.
 
 ### Notifications
 - Get notified (any Apprise destination) when a **new** title is added — separate **eBook Added to Library** and **Audiobook Added to Library** events. Fires only on genuinely new items, never on the initial baseline scan.
 
 ### Configure
 - **Settings → Kavita** and **Settings → Audiobookshelf** — connection (URL + API key, with a connection test), libraries to sync, cron schedule, and optional re-sync after a download completes.
-- **Settings → Security** — set the auth method to *Kavita* for SSO.
+- **Settings → Security** — set the auth method to *Kavita* for SSO, and enable Audiobookshelf auto-provisioning.
 - **Settings → General** — set **Library URL** / **Audiobook Library URL** so the in-library buttons link out.
 - **Settings → Users & Requests** — the request-type toggles.
 
