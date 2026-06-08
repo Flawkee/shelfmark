@@ -74,25 +74,65 @@ Works great alongside the following library tools, with support for automatic im
 
 ## 🚀 Quick Start
 
-### Prerequisites
+> This fork is published to Docker Hub as **[`flawkee/shelfmark`](https://hub.docker.com/r/flawkee/shelfmark)** (`latest` plus version tags such as `1.3.0-c`). The instructions below use the fork image; the Kavita / Audiobookshelf features are all opt-in, so an unconfigured instance behaves exactly like upstream.
 
-- Docker & Docker Compose
+### Option A — Docker (recommended)
 
-### Installation
+Prerequisites: Docker & Docker Compose.
 
-1. Download the [docker-compose file](compose/docker-compose.yml):
-   ```bash
-   curl -O https://raw.githubusercontent.com/calibrain/shelfmark/main/compose/docker-compose.yml
+1. Create a `docker-compose.yml`:
+   ```yaml
+   services:
+     shelfmark:
+       image: flawkee/shelfmark:latest
+       container_name: shelfmark
+       environment:
+         PUID: 1000
+         PGID: 1000
+       ports:
+         - "8084:8084"
+       volumes:
+         - ./config:/config # Config, database, and artwork cache
+         - ./books:/books    # Downloaded books / audiobooks
+       restart: unless-stopped
    ```
 
-2. Start the service:
+2. Start it:
    ```bash
    docker compose up -d
    ```
 
-3. Open `http://localhost:8084`
+3. Open `http://localhost:8084` and configure the sources/settings you want.
 
-Open the web interface, then configure the sources and settings you want to use.
+To pin a version, swap `latest` for a tag (e.g. `flawkee/shelfmark:1.3.0-c`).
+
+### Option B — Manual (no container)
+
+Prerequisites: Python 3.14+, Node 24+, [uv](https://docs.astral.sh/uv/), and git.
+
+```bash
+git clone https://github.com/Flawkee/shelfmark.git
+cd shelfmark
+
+# 1. Python dependencies (add --extra browser for the built-in Cloudflare/Selenium stack)
+uv sync --locked
+
+# 2. Build the frontend and stage it where the backend serves it (./frontend-dist)
+cd src/frontend && npm ci && npm run build && cd ../..
+rm -rf frontend-dist && cp -r src/frontend/dist frontend-dist
+#   Windows (PowerShell): Remove-Item -Recurse -Force frontend-dist; Copy-Item -Recurse src\frontend\dist frontend-dist
+
+# 3. Point Shelfmark at local data dirs and run it
+export CONFIG_DIR="$(pwd)/config"        # app config + database
+export INGEST_DIR="$(pwd)/books"         # download destination
+export USING_EXTERNAL_BYPASSER=true      # skip the built-in browser; omit if you ran `uv sync --extra browser`
+uv run gunicorn \
+  --worker-class geventwebsocket.gunicorn.workers.GeventWebSocketWorker \
+  --workers 1 -t 300 -b 0.0.0.0:8084 \
+  shelfmark.main:app
+```
+
+Then open `http://localhost:8084`. (On Windows, set the env vars with `$env:CONFIG_DIR=...` before the `uv run` command.)
 
 ### Volume Setup
 
